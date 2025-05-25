@@ -8,15 +8,15 @@ require('dotenv').config(); // Load environment variables from .env file
 
 // Import Mongoose Models
 const User = require('./models/UserModel');
-const Quiz = require('./models/QuizModel'); // Ensure this is imported
+const Quiz = require('./models/QuizModel');
 const Result = require('./models/ResultModel');
 
 const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://quiz-master-sigma-five.vercel.app', // Correct: No trailing slash
-  credentials: true, // Crucial for sending and receiving cookies cross-origin
+  origin: 'https://quiz-master-sigma-five.vercel.app', // Correct origin (no trailing slash)
+  credentials: true, // Essential for sending and receiving cookies cross-origin
 }));
 app.use(express.json()); // Parses JSON body payloads
 app.use(cookieParser()); // Parses cookies from the request headers
@@ -88,11 +88,11 @@ app.post('/login', async (req, res) => {
 
     const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'jwt-secret-key', { expiresIn: '1d' });
 
-    // *** IMPORTANT: Change sameSite to 'none' and ensure secure: true ***
+    // --- FIX APPLIED HERE ---
     res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // This will be true on Render (HTTPS)
-      sameSite: 'none', // <--- THIS IS THE CRUCIAL CHANGE
+      httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
+      secure: process.env.NODE_ENV === 'production', // Will be true on Render (HTTPS)
+      sameSite: 'none', // <--- CHANGED FROM 'lax' TO 'none' to allow cross-site cookie sending
       maxAge: 24 * 60 * 60 * 1000 // 1 day in milliseconds
     });
 
@@ -104,11 +104,11 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-  // *** Apply the same sameSite: 'none' for consistent cookie clearing ***
+  // --- FIX APPLIED HERE ---
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'none', // <--- IMPORTANT: Change this for logout too
+    secure: process.env.NODE_ENV === 'production', // Ensure consistency
+    sameSite: 'none', // <--- CHANGED FROM 'lax' TO 'none' for proper cookie clearing
   });
   res.status(200).json({ message: 'Logged out successfully' });
 });
