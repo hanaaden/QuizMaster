@@ -1,4 +1,3 @@
-import { Google Search } from 'google-search';
 
 const express = require('express');
 const mongoose = require('mongoose');
