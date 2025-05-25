@@ -15,8 +15,8 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://quiz-master-sigma-five.vercel.app/', // <<< IMPORTANT: Make sure this matches your frontend URL (e.g., http://localhost:3000 if using create-react-app)
-  credentials: true, // This is crucial for sending and receiving cookies
+  origin: 'https://quiz-master-sigma-five.vercel.app', // Remove the trailing slash
+  credentials: true,
 }));
 app.use(express.json()); // Parses JSON body payloads
 app.use(cookieParser()); // Parses cookies from the request headers
