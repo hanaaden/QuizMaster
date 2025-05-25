@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import axios from 'axios'; // Ensure axios is installed: npm install axios
 
 const LoginPage = ({ setUser }) => {
   const navigate = useNavigate();
@@ -13,35 +13,44 @@ const LoginPage = ({ setUser }) => {
     setError(''); // Clear any previous errors
     try {
       console.log("LoginPage: Attempting login for", email);
-      // Step 1: Send login credentials to the backend
-      // Backend should set an HTTP-only cookie upon successful authentication
-      await axios.post(
+
+      // --- MODIFIED: Send login credentials to the backend ---
+      // Expecting JWT in response body, so no 'withCredentials' needed here.
+      const response = await axios.post(
         'https://quizmaster-vhb6.onrender.com/login',
-        { email, password },
-        { withCredentials: true } // Crucial for sending and receiving cookies
+        { email, password }
       );
-      console.log("LoginPage: Login successful. Fetching user via /me...");
 
-      // Step 2: After successful login, make another request to /me
-      // This is to get the full user object (including role) which is usually not
-      // returned by the /login endpoint itself, but is available once authenticated.
-      const userRes = await axios.get("https://quizmaster-vhb6.onrender.com/me", { withCredentials: true });
-      console.log("LoginPage: /me response after login:", userRes.data);
+      console.log("LoginPage: Login successful. Response data:", response.data);
 
-      // Step 3: Update the global user state in App.jsx
-      // This causes App.jsx and Navbar to re-render with the authenticated user data
-      setUser(userRes.data.user);
-      console.log("LoginPage: setUser called with:", userRes.data.user);
+      // Store the token and user info from the response in Local Storage
+      // *** This is the critical client-side change ***
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('userRole', response.data.role); // Store role
+      localStorage.setItem('userId', response.data.userId); // Store userId if needed elsewhere
 
-      // Step 4: Redirect based on the user's role obtained from the /me endpoint
-      if (userRes.data.user.role === 'admin') {
+      // Set the user state directly from the login response if available,
+      // or fetch it from /me if /me gives richer user data.
+      // For simplicity, let's assume login returns enough for initial state.
+      // If your App.jsx's fetchUser is designed to run on mount,
+      // you can let it handle the initial user fetching after token storage.
+      setUser({ // Assuming response.data contains at least role and userId
+        userId: response.data.userId,
+        role: response.data.role,
+        email: email, // Email might not be in response, but we have it
+        // Add other user details if returned by your /login endpoint
+      });
+      console.log("LoginPage: User state updated with data from login response.");
+
+      // Redirect based on the user's role
+      if (response.data.role === 'admin') {
         console.log("LoginPage: Redirecting to /admin as role is admin.");
         navigate('/admin'); // Redirect to admin dashboard
       } else {
-        // For regular users, redirect to the quizzes listing page
         console.log("LoginPage: Redirecting to /quizzes as role is user.");
-        navigate('/quizzes'); // Changed from '/quiz' to '/quizzes' for consistency
+        navigate('/quizzes'); // Redirect to quizzes listing page
       }
+
     } catch (err) {
       console.error("LoginPage: Login error details:", err.response?.data || err.message || err);
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
@@ -50,8 +59,8 @@ const LoginPage = ({ setUser }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center
-                    bg-gradient-to-br from-purple-800 via-indigo-900 to-violet-950
-                    p-6 relative overflow-hidden">
+                   bg-gradient-to-br from-purple-800 via-indigo-900 to-violet-950
+                   p-6 relative overflow-hidden">
 
       {/* Subtle Background Blobs (Optional, requires tailwind.config.js setup from WelcomePage) */}
       <div className="absolute inset-0 z-0">

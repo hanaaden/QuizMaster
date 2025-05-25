@@ -2,9 +2,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
+const cookieParser = require('cookie-parser'); // Keep if other cookies are used, otherwise optional
 const cors = require('cors');
-require('dotenv').config(); // Load environment variables from .env file
+require('dotenv').config();
 
 // Import Mongoose Models
 const User = require('./models/UserModel');
@@ -15,8 +15,8 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://quiz-master-sigma-five.vercel.app', // Correct origin (no trailing slash)
-  credentials: true, // Essential for sending and receiving cookies cross-origin
+  origin: 'https://quiz-master-sigma-five.vercel.app', // Your frontend URL
+  credentials: true, // Keep this, as it's good practice for preflight requests and if you ever add other cookies
 }));
 app.use(express.json()); // Parses JSON body payloads
 app.use(cookieParser()); // Parses cookies from the request headers
@@ -27,13 +27,16 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 
-// JWT Middleware (Authentication)
+// JWT Middleware (Authentication) - MODIFIED FOR AUTHORIZATION HEADER
 const verifyUser = (req, res, next) => {
-  const token = req.cookies.token; // Get token from HTTP-only cookie
-  if (!token) {
-    console.log('No token found in cookies');
+  // Look for token in Authorization header (Bearer token)
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('No Authorization header or invalid format provided.');
     return res.status(401).json({ message: 'Unauthorized: No token provided' });
   }
+
+  const token = authHeader.split(' ')[1]; // Extract the token after 'Bearer '
 
   jwt.verify(token, process.env.JWT_SECRET || 'jwt-secret-key', (err, decoded) => {
     if (err) {
@@ -46,7 +49,7 @@ const verifyUser = (req, res, next) => {
   });
 };
 
-// Admin Middleware (Authorization)
+// Admin Middleware (Authorization) - No change needed
 const isAdmin = (req, res, next) => {
   if (req.role !== 'admin') {
     return res.status(403).json({ message: 'Forbidden: Admins only access' });
@@ -62,7 +65,6 @@ app.post('/register', async (req, res) => {
     if (existingUser) {
       return res.status(409).json({ message: 'User with this email already exists' });
     }
-
     const hash = await bcrypt.hash(password, 10);
     const user = new User({ username, email, password: hash, role: role || 'user' });
     await user.save();
@@ -88,15 +90,13 @@ app.post('/login', async (req, res) => {
 
     const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'jwt-secret-key', { expiresIn: '1d' });
 
-    // --- FIX APPLIED HERE ---
-    res.cookie('token', token, {
-      httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
-      secure: process.env.NODE_ENV === 'production', // Will be true on Render (HTTPS)
-      sameSite: 'none', // <--- CHANGED FROM 'lax' TO 'none' to allow cross-site cookie sending
-      maxAge: 24 * 60 * 60 * 1000 // 1 day in milliseconds
+    // *** MODIFIED: Send token in JSON response body, NOT as a cookie ***
+    res.status(200).json({
+      message: 'Login successful',
+      token: token, // <-- The JWT is now directly in the response
+      role: user.role, // Also send role and userId for frontend convenience
+      userId: user._id
     });
-
-    res.status(200).json({ message: 'Login successful', role: user.role, userId: user._id });
   } catch (error) {
     console.error('Error during login:', error);
     res.status(500).json({ message: 'Server error during login' });
@@ -104,16 +104,12 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-  // --- FIX APPLIED HERE ---
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // Ensure consistency
-    sameSite: 'none', // <--- CHANGED FROM 'lax' TO 'none' for proper cookie clearing
-  });
-  res.status(200).json({ message: 'Logged out successfully' });
+  // *** MODIFIED: No server-side cookie to clear for the main auth token ***
+  // The client (frontend) is now responsible for removing the token from Local Storage.
+  res.status(200).json({ message: 'Logged out successfully (client should clear token)' });
 });
 
-// --- User/Profile Routes ---
+// --- User/Profile Routes --- (No changes needed, verifyUser handles Auth header)
 app.get('/me', verifyUser, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('-password');
@@ -129,7 +125,7 @@ app.get('/me', verifyUser, async (req, res) => {
   }
 });
 
-// --- Quiz Routes (for users) ---
+// --- Quiz Routes (for users) --- (No changes needed, verifyUser handles Auth header)
 app.get('/quizzes', verifyUser, async (req, res) => {
   try {
     const quizzes = await Quiz.find({});
@@ -193,7 +189,7 @@ app.post('/quiz/:id/submit', verifyUser, async (req, res) => {
   }
 });
 
-// --- Admin Routes ---
+// --- Admin Routes --- (No changes needed, verifyUser handles Auth header)
 
 app.post('/admin/quiz', verifyUser, isAdmin, async (req, res) => {
   const { title, description, questions } = req.body;
