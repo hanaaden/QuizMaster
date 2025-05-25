@@ -10,7 +10,7 @@ const QuizPage = () => {
 
   useEffect(() => {
     axios
-      .get('http://localhost:5000/quizzes', { withCredentials: true })
+      .get('https://quizmaster-vhb6.onrender.com/quizzes', { withCredentials: true })
       .then((res) => {
         setQuizzes(res.data);
         setLoading(false);

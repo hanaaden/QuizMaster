@@ -15,7 +15,7 @@ const SignUpPage = () => {
     setError('');
     setSuccess(''); // Clear previous messages
     try {
-      await axios.post('http://localhost:5000/register', {
+      await axios.post('https://quizmaster-vhb6.onrender.com/register', {
         username,
         email,
         password,

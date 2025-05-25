@@ -16,7 +16,7 @@ const LoginPage = ({ setUser }) => {
       // Step 1: Send login credentials to the backend
       // Backend should set an HTTP-only cookie upon successful authentication
       await axios.post(
-        'http://localhost:5000/login',
+        'https://quizmaster-vhb6.onrender.com/login',
         { email, password },
         { withCredentials: true } // Crucial for sending and receiving cookies
       );
@@ -25,7 +25,7 @@ const LoginPage = ({ setUser }) => {
       // Step 2: After successful login, make another request to /me
       // This is to get the full user object (including role) which is usually not
       // returned by the /login endpoint itself, but is available once authenticated.
-      const userRes = await axios.get("http://localhost:5000/me", { withCredentials: true });
+      const userRes = await axios.get("https://quizmaster-vhb6.onrender.com/me", { withCredentials: true });
       console.log("LoginPage: /me response after login:", userRes.data);
 
       // Step 3: Update the global user state in App.jsx

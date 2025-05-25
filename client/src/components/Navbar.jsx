@@ -8,7 +8,7 @@ const Navbar = ({ user, setUser }) => {
 
   const handleLogout = async () => {
     try {
-      await axios.get('http://localhost:5000/logout', { withCredentials: true });
+      await axios.get('https://quizmaster-vhb6.onrender.com/logout', { withCredentials: true });
       setUser(null);
       navigate('/login');
     } catch (error) {

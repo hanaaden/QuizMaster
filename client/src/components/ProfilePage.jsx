@@ -9,7 +9,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     axios
-      .get('http://localhost:5000/me', { withCredentials: true })
+      .get('https://quizmaster-vhb6.onrender.com/me', { withCredentials: true })
       .then((res) => {
         setUser(res.data.user);
         setResults(res.data.results);

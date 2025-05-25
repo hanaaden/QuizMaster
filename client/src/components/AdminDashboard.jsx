@@ -42,10 +42,10 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
-        const quizzesRes = await axios.get('http://localhost:5000/quizzes', { withCredentials: true });
+        const quizzesRes = await axios.get('https://quizmaster-vhb6.onrender.com/quizzes', { withCredentials: true });
         setQuizzes(quizzesRes.data);
 
-        const usersRes = await axios.get('http://localhost:5000/admin/users', { withCredentials: true });
+        const usersRes = await axios.get('https://quizmaster-vhb6.onrender.com/admin/users', { withCredentials: true });
         setUsers(usersRes.data);
       } catch (err) {
         console.error('Error fetching admin data:', err);
@@ -153,7 +153,7 @@ const AdminDashboard = () => {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/admin/quiz', {
+      const response = await axios.post('https://quizmaster-vhb6.onrender.com/admin/quiz', {
         title: quizTitle,
         description: quizDescription,
         questions: formattedQuestions,
@@ -164,7 +164,7 @@ const AdminDashboard = () => {
       setQuizDescription('');
       setQuestions([{ questionText: '', options: ['', '', '', ''], correctOptionIndex: null }]);
 
-      const quizzesRes = await axios.get('http://localhost:5000/quizzes', { withCredentials: true });
+      const quizzesRes = await axios.get('https://quizmaster-vhb6.onrender.com/quizzes', { withCredentials: true });
       setQuizzes(quizzesRes.data);
     } catch (err) {
       console.error('Failed to create quiz:', err);
@@ -175,7 +175,7 @@ const AdminDashboard = () => {
   // --- Quiz Management Handlers ---
   const handleDeleteQuiz = async (quizId) => {
     try {
-      await axios.delete(`http://localhost:5000/admin/quiz/${quizId}`, { withCredentials: true });
+      await axios.delete(`https://quizmaster-vhb6.onrender.com/admin/quiz/${quizId}`, { withCredentials: true });
       setMessage('Quiz deleted successfully!');
       setQuizzes(quizzes.filter(q => q._id !== quizId));
     } catch (err) {
@@ -186,7 +186,7 @@ const AdminDashboard = () => {
 
   const editQuiz = async (quizId) => {
     try {
-      const res = await axios.get(`http://localhost:5000/quizzes/${quizId}`, { withCredentials: true });
+      const res = await axios.get(`https://quizmaster-vhb6.onrender.com/quizzes/${quizId}`, { withCredentials: true });
       const quizToEdit = res.data;
 
       setEditingQuiz(quizToEdit);
@@ -294,7 +294,7 @@ const AdminDashboard = () => {
     }
 
     try {
-      const response = await axios.put(`http://localhost:5000/admin/quiz/${editingQuiz._id}`, {
+      const response = await axios.put(`https://quizmaster-vhb6.onrender.com/admin/quiz/${editingQuiz._id}`, {
         title: editTitle,
         description: editDescription,
         questions: formattedQuestions,
@@ -303,7 +303,7 @@ const AdminDashboard = () => {
       setMessage(response.data.message);
       setEditingQuiz(null);
 
-      const quizzesRes = await axios.get('http://localhost:5000/quizzes', { withCredentials: true });
+      const quizzesRes = await axios.get('https://quizmaster-vhb6.onrender.com/quizzes', { withCredentials: true });
       setQuizzes(quizzesRes.data);
     } catch (err) {
       console.error('Failed to update quiz:', err);
@@ -315,7 +315,7 @@ const AdminDashboard = () => {
   const handleToggleAdmin = async (userId, currentRole) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     try {
-      const res = await axios.patch(`http://localhost:5000/admin/user/${userId}`, { role: newRole }, { withCredentials: true });
+      const res = await axios.patch(`https://quizmaster-vhb6.onrender.com/admin/user/${userId}`, { role: newRole }, { withCredentials: true });
       setMessage(res.data.message);
       setUsers(users.map(u => u._id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
@@ -326,7 +326,7 @@ const AdminDashboard = () => {
 
   const handleDeleteUser = async (userId) => {
     try {
-      await axios.delete(`http://localhost:5000/admin/user/${userId}`, { withCredentials: true });
+      await axios.delete(`https://quizmaster-vhb6.onrender.com/admin/user/${userId}`, { withCredentials: true });
       setMessage('User deleted successfully!');
       setUsers(users.filter(u => u._id !== userId));
     } catch (err) {

@@ -16,7 +16,7 @@ const TakeQuizPage = () => {
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/quizzes/${id}`, { withCredentials: true });
+        const res = await axios.get(`https://quizmaster-vhb6.onrender.com/quizzes/${id}`, { withCredentials: true });
         setQuiz(res.data);
         setAnswers(Array(res.data.questions.length).fill(null)); // Initialize answers array
         setLoading(false);
@@ -74,7 +74,7 @@ const TakeQuizPage = () => {
       setSubmissionStatus(null); // Reset status
       try {
         const res = await axios.post(
-          `http://localhost:5000/quiz/${id}/submit`,
+          `https://quizmaster-vhb6.onrender.com/quiz/${id}/submit`,
           { answers },
           { withCredentials: true }
         );
