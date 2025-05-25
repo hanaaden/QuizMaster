@@ -1,0 +1,354 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
+const cors = require('cors');
+require('dotenv').config(); // Load environment variables from .env file
+
+// Import Mongoose Models
+const User = require('./models/UserModel');
+const Quiz = require('./models/QuizModel'); // Ensure this is imported
+const Result = require('./models/ResultModel');
+
+const app = express();
+
+// Middleware
+app.use(cors({
+  origin: 'http://localhost:5173', // <<< IMPORTANT: Make sure this matches your frontend URL (e.g., http://localhost:3000 if using create-react-app)
+  credentials: true, // This is crucial for sending and receiving cookies
+}));
+app.use(express.json()); // Parses JSON body payloads
+app.use(cookieParser()); // Parses cookies from the request headers
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+
+// JWT Middleware (Authentication)
+const verifyUser = (req, res, next) => {
+  const token = req.cookies.token; // Get token from HTTP-only cookie
+  if (!token) {
+    console.log('No token found in cookies');
+    return res.status(401).json({ message: 'Unauthorized: No token provided' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET || 'jwt-secret-key', (err, decoded) => { // Use env variable for secret
+    if (err) {
+      console.error('Token verification failed:', err);
+      return res.status(403).json({ message: 'Unauthorized: Invalid token' });
+    }
+    req.userId = decoded.userId;
+    req.role = decoded.role;
+    next(); // Proceed to the next middleware/route handler
+  });
+};
+
+// Admin Middleware (Authorization)
+const isAdmin = (req, res, next) => {
+  if (req.role !== 'admin') {
+    return res.status(403).json({ message: 'Forbidden: Admins only access' });
+  }
+  next();
+};
+
+// --- Auth Routes ---
+app.post('/register', async (req, res) => {
+  const { username, email, password, role } = req.body;
+  try {
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ message: 'User with this email already exists' });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const user = new User({ username, email, password: hash, role: role || 'user' }); // Default role to 'user'
+    await user.save();
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    console.error('Error during registration:', error);
+    res.status(500).json({ message: 'Server error during registration' });
+  }
+});
+
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Create a JWT with user ID and role
+    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'jwt-secret-key', { expiresIn: '1d' }); // Token expires in 1 day for security
+
+    // Set the token as an HTTP-only cookie
+    res.cookie('token', token, {
+      httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
+      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
+      sameSite: 'lax', // Protects against CSRF attacks
+      maxAge: 24 * 60 * 60 * 1000 // 1 day in milliseconds
+    });
+
+    res.status(200).json({ message: 'Login successful', role: user.role, userId: user._id });
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ message: 'Server error during login' });
+  }
+});
+
+app.get('/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
+  res.status(200).json({ message: 'Logged out successfully' });
+});
+
+// --- User/Profile Routes ---
+app.get('/me', verifyUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password'); // Exclude password
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Populate quiz details for results
+    const results = await Result.find({ userId: req.userId }).populate('quizId', 'title');
+    // Ensure `quizId` is populated with `title` for the frontend `ProfilePage.js` to display.
+    // If a quiz was deleted, `quizId` might be null, handle this in frontend.
+
+    res.status(200).json({ user, results });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ message: 'Server error fetching profile' });
+  }
+});
+
+// --- Quiz Routes (for users) ---
+app.get('/quizzes', verifyUser, async (req, res) => {
+  try {
+    const quizzes = await Quiz.find({});
+    res.status(200).json(quizzes);
+  } catch (error) {
+    console.error('Error fetching quizzes:', error);
+    res.status(500).json({ message: 'Server error fetching quizzes' });
+  }
+});
+
+app.get('/quizzes/:id', verifyUser, async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+    // You might want to strip correct answers for general users here
+    // However, for simplicity, we'll send the full quiz (which includes correct answer details for admin editing)
+    res.status(200).json(quiz);
+  } catch (error) {
+    console.error('Error fetching single quiz:', error);
+    res.status(500).json({ message: 'Server error fetching quiz' });
+  }
+});
+
+app.post('/quiz/:id/submit', verifyUser, async (req, res) => {
+  const { answers } = req.body;
+  const quizId = req.params.id;
+  const userId = req.userId;
+
+  try {
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    if (!answers || !Array.isArray(answers) || answers.length !== quiz.questions.length) {
+      return res.status(400).json({ message: 'Invalid answers array provided' });
+    }
+
+    let score = 0;
+    quiz.questions.forEach((q, idx) => {
+      // Find the correct option based on `isCorrect` property in the options array
+      const correctOption = q.options.find(opt => opt.isCorrect === true);
+      const submittedAnswerIndex = answers[idx]; // This is the index of the option chosen by the user
+
+      if (correctOption && q.options.indexOf(correctOption) === submittedAnswerIndex) {
+        score++;
+      }
+    });
+
+    // Save the result
+    const result = new Result({
+      userId: userId,
+      quizId: quiz._id,
+      score: score,
+      total: quiz.questions.length,
+    });
+    await result.save();
+
+    res.status(200).json({ message: 'Quiz submitted successfully', score, total: quiz.questions.length });
+  } catch (error) {
+    console.error('Error submitting quiz:', error);
+    res.status(500).json({ message: 'Server error submitting quiz' });
+  }
+});
+
+// --- Admin Routes ---
+
+// New route for creating quizzes (POST /admin/quiz)
+app.post('/admin/quiz', verifyUser, isAdmin, async (req, res) => {
+  const { title, description, questions } = req.body; // Expect title, description, and an array of questions
+
+  if (!title || !questions || questions.length === 0) {
+    return res.status(400).json({ message: 'Please enter quiz title and at least one question.' });
+  }
+
+  try {
+    const newQuiz = new Quiz({
+      title,
+      description,
+      questions,
+      createdBy: req.userId, // Use req.userId from verifyUser middleware
+    });
+
+    const savedQuiz = await newQuiz.save();
+    res.status(201).json({ message: 'Quiz created successfully!', quiz: savedQuiz });
+  } catch (error) {
+    console.error('Error creating quiz:', error);
+    // Check for duplicate key error (e.g., duplicate quiz title if unique is set in model)
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'A quiz with this title already exists. Please choose a different title.' });
+    }
+    res.status(500).json({ message: 'Server error during quiz creation.', error: error.message });
+  }
+});
+
+// Route for updating an existing quiz (PUT /admin/quiz/:id)
+app.put('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
+  const { title, description, questions } = req.body;
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    quiz.title = title !== undefined ? title : quiz.title;
+    quiz.description = description !== undefined ? description : quiz.description;
+    
+    // Validate and update questions array if provided
+    if (questions && Array.isArray(questions)) {
+      // Basic validation for questions array structure
+      const areQuestionsValid = questions.every(q => 
+        q.questionText && typeof q.questionText === 'string' && q.questionText.trim() !== '' &&
+        Array.isArray(q.options) && q.options.length >= 2 && 
+        q.options.every(opt => typeof opt.text === 'string' && opt.text.trim() !== '' && typeof opt.isCorrect === 'boolean') &&
+        (q.correctOptionIndex !== undefined && q.correctOptionIndex !== null && q.correctOptionIndex >=0 && q.correctOptionIndex < q.options.length)
+      );
+
+      if (!areQuestionsValid) {
+        return res.status(400).json({ message: 'Invalid questions format provided for update. Each question needs text, at least two non-empty options, and a selected correct answer.' });
+      }
+      quiz.questions = questions; // Directly assign the validated questions array
+    } else if (questions !== undefined) { // If questions is provided but not an array
+      return res.status(400).json({ message: 'Questions must be an array.' });
+    }
+
+    const updatedQuiz = await quiz.save();
+    res.status(200).json({ message: 'Quiz updated successfully!', quiz: updatedQuiz });
+  } catch (error) {
+    console.error('Error updating quiz:', error);
+    // Mongoose validation errors will be caught here as well
+    if (error.name === 'ValidationError') {
+        return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Server error updating quiz.', error: error.message });
+  }
+});
+
+app.get('/admin/users', verifyUser, isAdmin, async (req, res) => {
+  try {
+    const users = await User.find({}).select('-password'); // Get all users, exclude password
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching all users (admin):', error);
+    res.status(500).json({ message: 'Server error fetching users' });
+  }
+});
+
+app.patch('/admin/user/:id', verifyUser, isAdmin, async (req, res) => {
+  const { role } = req.body;
+  const userIdToUpdate = req.params.id;
+
+  if (req.userId === userIdToUpdate) {
+    return res.status(403).json({ message: "Forbidden: Cannot change your own role via this endpoint." });
+  }
+
+  try {
+    const user = await User.findById(userIdToUpdate);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role provided. Must be "user" or "admin".' });
+    }
+
+    user.role = role;
+    await user.save();
+    res.status(200).json({ message: 'User role updated successfully', user: user.username, newRole: user.role });
+  } catch (error) {
+    console.error('Error updating user role (admin):', error);
+    res.status(500).json({ message: 'Server error updating user role' });
+  }
+});
+
+app.delete('/admin/user/:id', verifyUser, isAdmin, async (req, res) => {
+  const userIdToDelete = req.params.id;
+
+  if (req.userId === userIdToDelete) {
+    return res.status(403).json({ message: "Forbidden: Cannot delete your own account via this endpoint." });
+  }
+
+  try {
+    const user = await User.findByIdAndDelete(userIdToDelete);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Also delete any results associated with this user
+    await Result.deleteMany({ userId: userIdToDelete });
+    res.status(200).json({ message: 'User and associated results deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user (admin):', error);
+    res.status(500).json({ message: 'Server error deleting user' });
+  }
+});
+
+app.delete('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
+  try {
+    const quiz = await Quiz.findByIdAndDelete(req.params.id);
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+    // Also delete any results associated with this quiz
+    await Result.deleteMany({ quizId: req.params.id });
+    res.status(200).json({ message: 'Quiz and associated results deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting quiz (admin):', error);
+    res.status(500).json({ message: 'Server error deleting quiz' });
+  }
+});
+
+// Start the server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
