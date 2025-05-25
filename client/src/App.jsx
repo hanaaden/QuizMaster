@@ -26,7 +26,7 @@ const App = () => {
       try {
         // Make a GET request to your backend's /me endpoint
         // withCredentials is essential for sending HTTP-only cookies
-        const res = await axios.get("http://localhost:5000/me", { withCredentials: true });
+        const res = await axios.get("https://quizmaster-vhb6.onrender.com/me", { withCredentials: true });
         console.log("App.js: /me response received:", res.data);
         setUser(res.data.user); // Set the user state with fetched data
       } catch (err) {
