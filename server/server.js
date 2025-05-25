@@ -15,7 +15,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://quiz-master-seven-amber.vercel.app/', // Your frontend URL
+  origin: 'https://quiz-master-seven-amber.vercel.app', // Your frontend URL
   credentials: true, // Keep this, as it's good practice for preflight requests and if you ever add other cookies
 }));
 app.use(express.json()); // Parses JSON body payloads
