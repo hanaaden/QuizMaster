@@ -15,8 +15,8 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://quiz-master-sigma-five.vercel.app', // Remove the trailing slash
-  credentials: true,
+  origin: 'https://quiz-master-sigma-five.vercel.app', // Correct: No trailing slash
+  credentials: true, // Crucial for sending and receiving cookies cross-origin
 }));
 app.use(express.json()); // Parses JSON body payloads
 app.use(cookieParser()); // Parses cookies from the request headers
@@ -35,14 +35,14 @@ const verifyUser = (req, res, next) => {
     return res.status(401).json({ message: 'Unauthorized: No token provided' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'jwt-secret-key', (err, decoded) => { // Use env variable for secret
+  jwt.verify(token, process.env.JWT_SECRET || 'jwt-secret-key', (err, decoded) => {
     if (err) {
       console.error('Token verification failed:', err);
       return res.status(403).json({ message: 'Unauthorized: Invalid token' });
     }
     req.userId = decoded.userId;
     req.role = decoded.role;
-    next(); // Proceed to the next middleware/route handler
+    next();
   });
 };
 
@@ -58,14 +58,13 @@ const isAdmin = (req, res, next) => {
 app.post('/register', async (req, res) => {
   const { username, email, password, role } = req.body;
   try {
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(409).json({ message: 'User with this email already exists' });
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const user = new User({ username, email, password: hash, role: role || 'user' }); // Default role to 'user'
+    const user = new User({ username, email, password: hash, role: role || 'user' });
     await user.save();
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
@@ -87,14 +86,13 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Create a JWT with user ID and role
-    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'jwt-secret-key', { expiresIn: '1d' }); // Token expires in 1 day for security
+    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'jwt-secret-key', { expiresIn: '1d' });
 
-    // Set the token as an HTTP-only cookie
+    // *** IMPORTANT: Change sameSite to 'none' and ensure secure: true ***
     res.cookie('token', token, {
-      httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
-      sameSite: 'lax', // Protects against CSRF attacks
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // This will be true on Render (HTTPS)
+      sameSite: 'none', // <--- THIS IS THE CRUCIAL CHANGE
       maxAge: 24 * 60 * 60 * 1000 // 1 day in milliseconds
     });
 
@@ -106,10 +104,11 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
+  // *** Apply the same sameSite: 'none' for consistent cookie clearing ***
   res.clearCookie('token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'none', // <--- IMPORTANT: Change this for logout too
   });
   res.status(200).json({ message: 'Logged out successfully' });
 });
@@ -117,16 +116,12 @@ app.get('/logout', (req, res) => {
 // --- User/Profile Routes ---
 app.get('/me', verifyUser, async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('-password'); // Exclude password
+    const user = await User.findById(req.userId).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Populate quiz details for results
     const results = await Result.find({ userId: req.userId }).populate('quizId', 'title');
-    // Ensure `quizId` is populated with `title` for the frontend `ProfilePage.js` to display.
-    // If a quiz was deleted, `quizId` might be null, handle this in frontend.
-
     res.status(200).json({ user, results });
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -151,8 +146,6 @@ app.get('/quizzes/:id', verifyUser, async (req, res) => {
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
-    // You might want to strip correct answers for general users here
-    // However, for simplicity, we'll send the full quiz (which includes correct answer details for admin editing)
     res.status(200).json(quiz);
   } catch (error) {
     console.error('Error fetching single quiz:', error);
@@ -177,16 +170,14 @@ app.post('/quiz/:id/submit', verifyUser, async (req, res) => {
 
     let score = 0;
     quiz.questions.forEach((q, idx) => {
-      // Find the correct option based on `isCorrect` property in the options array
       const correctOption = q.options.find(opt => opt.isCorrect === true);
-      const submittedAnswerIndex = answers[idx]; // This is the index of the option chosen by the user
+      const submittedAnswerIndex = answers[idx];
 
       if (correctOption && q.options.indexOf(correctOption) === submittedAnswerIndex) {
         score++;
       }
     });
 
-    // Save the result
     const result = new Result({
       userId: userId,
       quizId: quiz._id,
@@ -204,9 +195,8 @@ app.post('/quiz/:id/submit', verifyUser, async (req, res) => {
 
 // --- Admin Routes ---
 
-// New route for creating quizzes (POST /admin/quiz)
 app.post('/admin/quiz', verifyUser, isAdmin, async (req, res) => {
-  const { title, description, questions } = req.body; // Expect title, description, and an array of questions
+  const { title, description, questions } = req.body;
 
   if (!title || !questions || questions.length === 0) {
     return res.status(400).json({ message: 'Please enter quiz title and at least one question.' });
@@ -217,14 +207,13 @@ app.post('/admin/quiz', verifyUser, isAdmin, async (req, res) => {
       title,
       description,
       questions,
-      createdBy: req.userId, // Use req.userId from verifyUser middleware
+      createdBy: req.userId,
     });
 
     const savedQuiz = await newQuiz.save();
     res.status(201).json({ message: 'Quiz created successfully!', quiz: savedQuiz });
   } catch (error) {
     console.error('Error creating quiz:', error);
-    // Check for duplicate key error (e.g., duplicate quiz title if unique is set in model)
     if (error.code === 11000) {
       return res.status(409).json({ message: 'A quiz with this title already exists. Please choose a different title.' });
     }
@@ -232,7 +221,6 @@ app.post('/admin/quiz', verifyUser, isAdmin, async (req, res) => {
   }
 });
 
-// Route for updating an existing quiz (PUT /admin/quiz/:id)
 app.put('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
   const { title, description, questions } = req.body;
   try {
@@ -243,13 +231,11 @@ app.put('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
 
     quiz.title = title !== undefined ? title : quiz.title;
     quiz.description = description !== undefined ? description : quiz.description;
-    
-    // Validate and update questions array if provided
+
     if (questions && Array.isArray(questions)) {
-      // Basic validation for questions array structure
-      const areQuestionsValid = questions.every(q => 
+      const areQuestionsValid = questions.every(q =>
         q.questionText && typeof q.questionText === 'string' && q.questionText.trim() !== '' &&
-        Array.isArray(q.options) && q.options.length >= 2 && 
+        Array.isArray(q.options) && q.options.length >= 2 &&
         q.options.every(opt => typeof opt.text === 'string' && opt.text.trim() !== '' && typeof opt.isCorrect === 'boolean') &&
         (q.correctOptionIndex !== undefined && q.correctOptionIndex !== null && q.correctOptionIndex >=0 && q.correctOptionIndex < q.options.length)
       );
@@ -257,8 +243,8 @@ app.put('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
       if (!areQuestionsValid) {
         return res.status(400).json({ message: 'Invalid questions format provided for update. Each question needs text, at least two non-empty options, and a selected correct answer.' });
       }
-      quiz.questions = questions; // Directly assign the validated questions array
-    } else if (questions !== undefined) { // If questions is provided but not an array
+      quiz.questions = questions;
+    } else if (questions !== undefined) {
       return res.status(400).json({ message: 'Questions must be an array.' });
     }
 
@@ -266,9 +252,8 @@ app.put('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
     res.status(200).json({ message: 'Quiz updated successfully!', quiz: updatedQuiz });
   } catch (error) {
     console.error('Error updating quiz:', error);
-    // Mongoose validation errors will be caught here as well
     if (error.name === 'ValidationError') {
-        return res.status(400).json({ message: error.message });
+      return res.status(400).json({ message: error.message });
     }
     res.status(500).json({ message: 'Server error updating quiz.', error: error.message });
   }
@@ -276,7 +261,7 @@ app.put('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
 
 app.get('/admin/users', verifyUser, isAdmin, async (req, res) => {
   try {
-    const users = await User.find({}).select('-password'); // Get all users, exclude password
+    const users = await User.find({}).select('-password');
     res.status(200).json(users);
   } catch (error) {
     console.error('Error fetching all users (admin):', error);
@@ -297,7 +282,7 @@ app.patch('/admin/user/:id', verifyUser, isAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role provided. Must be "user" or "admin".' });
     }
@@ -323,7 +308,6 @@ app.delete('/admin/user/:id', verifyUser, isAdmin, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    // Also delete any results associated with this user
     await Result.deleteMany({ userId: userIdToDelete });
     res.status(200).json({ message: 'User and associated results deleted successfully' });
   } catch (error) {
@@ -338,7 +322,6 @@ app.delete('/admin/quiz/:id', verifyUser, isAdmin, async (req, res) => {
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
-    // Also delete any results associated with this quiz
     await Result.deleteMany({ quizId: req.params.id });
     res.status(200).json({ message: 'Quiz and associated results deleted successfully' });
   } catch (error) {
