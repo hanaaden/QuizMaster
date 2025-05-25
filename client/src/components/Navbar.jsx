@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios'; // Ensure axios is imported
+import axios from 'axios';
+
+// Configure axios to always send the Authorization header if a token exists
+axios.interceptors.request.use(
+    config => {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    error => {
+        return Promise.reject(error);
+    }
+);
 
 const Navbar = ({ user, setUser }) => {
     const navigate = useNavigate();
@@ -8,29 +22,24 @@ const Navbar = ({ user, setUser }) => {
 
     const handleLogout = async () => {
         try {
-            // Send a POST request to the logout endpoint.
-            // The backend doesn't need credentials for this as it's just a signal to invalidate session/clear token.
-            // The frontend's main task here is to clear its local storage.
+            // --- MODIFIED: Change to POST request, remove withCredentials ---
             await axios.post('https://quizmaster-vhb6.onrender.com/logout');
 
-            // Clear authentication related data from Local Storage
+            // --- MODIFIED: Clear token from Local Storage ---
             localStorage.removeItem('authToken');
             localStorage.removeItem('userRole');
             localStorage.removeItem('userId');
-            localStorage.removeItem('username'); // Clear username as well
 
             setUser(null); // Clear user state in App.js
-            console.log("Logged out successfully.");
             navigate('/login'); // Redirect to login page after logout
+            console.log("Logged out successfully.");
         } catch (error) {
-            console.error('Logout failed on server:', error.response?.data || error.message);
-            alert('Logout failed on server. Please try again. (Token cleared locally for safety)');
-            // Even if the server-side logout fails (e.g., network error),
-            // clear client-side state to prevent stale login issues.
+            console.error('Logout failed:', error.response?.data || error.message);
+            alert('Logout failed. Please try again. (Token cleared locally)');
+            // Even if logout fails on server, clear client state to prevent stale login
             localStorage.removeItem('authToken');
             localStorage.removeItem('userRole');
             localStorage.removeItem('userId');
-            localStorage.removeItem('username');
             setUser(null);
             navigate('/login');
         }

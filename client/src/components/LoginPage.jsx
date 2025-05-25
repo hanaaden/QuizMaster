@@ -14,8 +14,7 @@ const LoginPage = ({ setUser }) => {
         try {
             console.log("LoginPage: Attempting login for", email);
 
-            // Send login credentials to the backend.
-            // No 'withCredentials' needed here as the token is expected in the response body.
+            // --- MODIFIED: Removed 'withCredentials' as token is in response body ---
             const response = await axios.post(
                 'https://quizmaster-vhb6.onrender.com/login',
                 { email, password }
@@ -27,14 +26,13 @@ const LoginPage = ({ setUser }) => {
             localStorage.setItem('authToken', response.data.token);
             localStorage.setItem('userRole', response.data.role); // Store role
             localStorage.setItem('userId', response.data.userId); // Store userId
-            // Assuming the backend also sends username on login
-            localStorage.setItem('username', response.data.username);
 
-            // Set the user state directly from the login response
-            setUser({
+            // Set the user state directly from the login response if available,
+            // or fetch it from /me if /me gives richer user data.
+            setUser({ // Assuming response.data contains at least role and userId
                 userId: response.data.userId,
                 role: response.data.role,
-                username: response.data.username,
+                username: response.data.username, // Include username if your backend sends it
                 email: email, // Email might not be in response, but we have it from input
             });
             console.log("LoginPage: User state updated with data from login response.");
