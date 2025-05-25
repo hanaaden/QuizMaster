@@ -67,7 +67,7 @@ const LoginPage = ({ setUser }) => {
                    transform transition-all duration-500 hover:scale-[1.02] animate-fadeIn"
       >
         <h2 className="text-4xl font-extrabold mb-8 text-center text-white tracking-tight">
-          Login to <span className="text-purple-300">Quizify</span>
+          Login to <span className="text-purple-300">QuizMaster</span>
         </h2>
 
         {error && (

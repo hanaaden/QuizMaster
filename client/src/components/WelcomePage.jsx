@@ -23,11 +23,12 @@ const WelcomePage = () => {
 
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold mb-4
                        tracking-tight leading-tight animate-slideInDown"> {/* Adjusted font sizes and added tracking/leading */}
-          Quizify
+          QuizMaster
         </h1>
         <p className="text-lg sm:text-xl md:text-2xl mb-12 font-light
                       opacity-90 animate-slideInUp"> {/* Adjusted font sizes and opacity */}
           Test Your Knowledge. Sharpen Your Mind.
+          "A pen is mightier than a sword, and knowledge is light." – Imam Ali (RA)
         </p>
 
         <div className="space-y-6 sm:space-y-8 animate-fadeInUpBig"> {/* Increased spacing and added a different animation */}

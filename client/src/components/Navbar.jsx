@@ -25,7 +25,7 @@ const Navbar = ({ user, setUser }) => {
       <div className="container mx-auto flex justify-between items-center">
         {/* Brand/Logo link */}
         <Link to={isAuthenticated ? "/quizzes" : "/"} className="text-3xl font-extrabold tracking-wide hover:text-purple-200 transition-colors duration-300">
-          Quizify
+          QuizMaster
         </Link>
 
         {/* Hamburger icon for mobile */}
