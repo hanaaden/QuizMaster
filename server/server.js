@@ -22,11 +22,9 @@ app.use(cors({
     origin: (origin, callback) => {
         // Define allowed origins
         const allowedOrigins = [
-            'https://quiz-master-seven-amber.vercel.app', // Your DEPLOYED Vercel frontend URL
-            'http://localhost:3000', // Common React development server port (Create React App)
-            'http://localhost:5173', // Common Vite development server port (if you're using Vite)
-            // If you have a custom domain for your Vercel frontend, add it here too:
-            // 'https://your-custom-domain.com',
+            'https://quiz-master-seven-amber.vercel.app', // REMOVED THE TRAILING SLASH HERE
+            'http://localhost:3000', // ADD BACK YOUR LOCAL DEV URL FOR TESTING
+            'http://localhost:5173', // ADD BACK YOUR LOCAL VITE DEV URL IF APPLICABLE
         ];
 
         // Allow requests with no origin (like mobile apps, Postman, or server-to-server requests)
@@ -42,7 +40,6 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], // Specify allowed HTTP methods
     allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers from client
 }));
-
 app.use(express.json()); // Parses incoming JSON request bodies
 app.use(cookieParser()); // Parses cookies from the request headers (populates req.cookies)
 
