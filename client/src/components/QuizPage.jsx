@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom'; // Keep Link if you use it in other parts of this component, otherwise remove
 
 // Get the API base URL from environment variables, no localhost fallback
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+const API_BASE_URL = "https://quizmaster-vhb6.onrender.com";
 
 const QuizPage = ({ user, logout }) => { // Added user and logout props for consistency and robust error handling
   const [quizzes, setQuizzes] = useState([]);

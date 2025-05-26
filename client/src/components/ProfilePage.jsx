@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate for redirection on error
 
 // Get the API base URL from environment variables, no localhost fallback
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+const API_BASE_URL = "https://quizmaster-vhb6.onrender.com";
 
 const ProfilePage = ({ logout }) => { // Added logout prop for robust error handling
   const [user, setUser] = useState(null);

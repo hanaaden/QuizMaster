@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 // Get the API base URL from environment variables, no localhost fallback
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ;
+const API_BASE_URL = "https://quizmaster-vhb6.onrender.com";
 
 // Configure axios to always send the Authorization header if a token exists
 // IMPORTANT: With HttpOnly cookies, the browser automatically sends the cookie.

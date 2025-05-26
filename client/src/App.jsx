@@ -15,7 +15,7 @@ import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Get the API base URL from environment variables
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = "https://quizmaster-vhb6.onrender.com";
 
 const App = () => {
   const [user, setUser] = useState(null);
