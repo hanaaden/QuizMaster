@@ -64,8 +64,8 @@ const verifyUser = (req, res, next) => {
             // Clear invalid token cookie to prevent repeated attempts
             res.clearCookie('token', {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+                secure: false,
+                sameSite: 'None',
                 path: '/'
             });
             return res.status(403).json({ message: 'Unauthorized: Invalid or expired token' });
