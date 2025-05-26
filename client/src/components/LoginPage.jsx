@@ -5,7 +5,7 @@ import axios from 'axios';
 // Get the API base URL from environment variables.
 // This WILL be set to your deployed Render backend URL (e.g., 'https://quizmaster-vhb6.onrender.com')
 // when deployed on Vercel. There is NO localhost fallback here.
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 const LoginPage = ({ setUser }) => {
     const navigate = useNavigate();

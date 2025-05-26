@@ -3,8 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 // Get the API base URL from environment variables
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ;
 const AdminDashboard = () => {
   const navigate = useNavigate();
 
