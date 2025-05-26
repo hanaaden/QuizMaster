@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+// Get the API base URL from environment variables
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
 
@@ -41,19 +44,32 @@ const AdminDashboard = () => {
   // --- Fetch Quizzes and Users on component mount ---
   useEffect(() => {
     const fetchAdminData = async () => {
+      // Essential check for API_BASE_URL
+      if (!API_BASE_URL) {
+        console.error("Error: API_BASE_URL is not defined. Please ensure it's set as an environment variable.");
+        setError("Configuration error: Backend URL not found. Please contact support.");
+        return;
+      }
+
       try {
-        const quizzesRes = await axios.get('https://quizmaster-vhb6.onrender.com/quizzes', { withCredentials: true });
+        console.log(`AdminDashboard: Fetching quizzes from ${API_BASE_URL}/quizzes`);
+        const quizzesRes = await axios.get(`${API_BASE_URL}/quizzes`, { withCredentials: true });
         setQuizzes(quizzesRes.data);
 
-        const usersRes = await axios.get('https://quizmaster-vhb6.onrender.com/admin/users', { withCredentials: true });
+        console.log(`AdminDashboard: Fetching users from ${API_BASE_URL}/admin/users`);
+        const usersRes = await axios.get(`${API_BASE_URL}/admin/users`, { withCredentials: true });
         setUsers(usersRes.data);
       } catch (err) {
-        console.error('Error fetching admin data:', err);
+        console.error('Error fetching admin data:', err.response?.data?.message || err.message || err);
         setError(err.response?.data?.message || 'Failed to load admin data.');
+        // Optionally redirect if unauthorized access
+        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          navigate('/login'); // Or to a specific unauthorized page
+        }
       }
     };
     fetchAdminData();
-  }, []);
+  }, [navigate]); // Add navigate to dependency array
 
   // --- Pop-up Confirmation Handlers ---
   const triggerConfirm = (message, action, id, type, role = '') => {
@@ -153,7 +169,8 @@ const AdminDashboard = () => {
     }
 
     try {
-      const response = await axios.post('https://quizmaster-vhb6.onrender.com/admin/quiz', {
+      console.log(`AdminDashboard: Creating quiz at ${API_BASE_URL}/admin/quiz`);
+      const response = await axios.post(`${API_BASE_URL}/admin/quiz`, {
         title: quizTitle,
         description: quizDescription,
         questions: formattedQuestions,
@@ -164,10 +181,12 @@ const AdminDashboard = () => {
       setQuizDescription('');
       setQuestions([{ questionText: '', options: ['', '', '', ''], correctOptionIndex: null }]);
 
-      const quizzesRes = await axios.get('https://quizmaster-vhb6.onrender.com/quizzes', { withCredentials: true });
+      // Re-fetch quizzes after creation
+      console.log(`AdminDashboard: Re-fetching quizzes from ${API_BASE_URL}/quizzes`);
+      const quizzesRes = await axios.get(`${API_BASE_URL}/quizzes`, { withCredentials: true });
       setQuizzes(quizzesRes.data);
     } catch (err) {
-      console.error('Failed to create quiz:', err);
+      console.error('Failed to create quiz:', err.response?.data?.message || err.message || err);
       setError(err.response?.data?.message || 'Failed to create quiz. Check server logs for details.');
     }
   };
@@ -175,18 +194,20 @@ const AdminDashboard = () => {
   // --- Quiz Management Handlers ---
   const handleDeleteQuiz = async (quizId) => {
     try {
-      await axios.delete(`https://quizmaster-vhb6.onrender.com/admin/quiz/${quizId}`, { withCredentials: true });
+      console.log(`AdminDashboard: Deleting quiz ${quizId} from ${API_BASE_URL}/admin/quiz/${quizId}`);
+      await axios.delete(`${API_BASE_URL}/admin/quiz/${quizId}`, { withCredentials: true });
       setMessage('Quiz deleted successfully!');
       setQuizzes(quizzes.filter(q => q._id !== quizId));
     } catch (err) {
-      console.error('Error deleting quiz:', err);
+      console.error('Error deleting quiz:', err.response?.data?.message || err.message || err);
       setError(err.response?.data?.message || 'Failed to delete quiz.');
     }
   };
 
   const editQuiz = async (quizId) => {
     try {
-      const res = await axios.get(`https://quizmaster-vhb6.onrender.com/quizzes/${quizId}`, { withCredentials: true });
+      console.log(`AdminDashboard: Fetching quiz ${quizId} for editing from ${API_BASE_URL}/quizzes/${quizId}`);
+      const res = await axios.get(`${API_BASE_URL}/quizzes/${quizId}`, { withCredentials: true });
       const quizToEdit = res.data;
 
       setEditingQuiz(quizToEdit);
@@ -201,7 +222,7 @@ const AdminDashboard = () => {
       setMessage('');
       setError('');
     } catch (err) {
-      console.error('Error fetching quiz for editing:', err);
+      console.error('Error fetching quiz for editing:', err.response?.data?.message || err.message || err);
       setError(err.response?.data?.message || 'Failed to load quiz for editing.');
     }
   };
@@ -294,19 +315,22 @@ const AdminDashboard = () => {
     }
 
     try {
-      const response = await axios.put(`https://quizmaster-vhb6.onrender.com/admin/quiz/${editingQuiz._id}`, {
+      console.log(`AdminDashboard: Updating quiz ${editingQuiz._id} at ${API_BASE_URL}/admin/quiz/${editingQuiz._id}`);
+      const response = await axios.put(`${API_BASE_URL}/admin/quiz/${editingQuiz._id}`, {
         title: editTitle,
         description: editDescription,
         questions: formattedQuestions,
       }, { withCredentials: true });
 
       setMessage(response.data.message);
-      setEditingQuiz(null);
+      setEditingQuiz(null); // Close the modal
 
-      const quizzesRes = await axios.get('https://quizmaster-vhb6.onrender.com/quizzes', { withCredentials: true });
+      // Re-fetch quizzes after update
+      console.log(`AdminDashboard: Re-fetching quizzes from ${API_BASE_URL}/quizzes`);
+      const quizzesRes = await axios.get(`${API_BASE_URL}/quizzes`, { withCredentials: true });
       setQuizzes(quizzesRes.data);
     } catch (err) {
-      console.error('Failed to update quiz:', err);
+      console.error('Failed to update quiz:', err.response?.data?.message || err.message || err);
       setError(err.response?.data?.message || 'Failed to update quiz. Check server logs.');
     }
   };
@@ -315,22 +339,24 @@ const AdminDashboard = () => {
   const handleToggleAdmin = async (userId, currentRole) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     try {
-      const res = await axios.patch(`https://quizmaster-vhb6.onrender.com/admin/user/${userId}`, { role: newRole }, { withCredentials: true });
+      console.log(`AdminDashboard: Toggling role for user ${userId} to ${newRole} at ${API_BASE_URL}/admin/user/${userId}`);
+      const res = await axios.patch(`${API_BASE_URL}/admin/user/${userId}`, { role: newRole }, { withCredentials: true });
       setMessage(res.data.message);
       setUsers(users.map(u => u._id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
-      console.error('Error changing user role:', err);
+      console.error('Error changing user role:', err.response?.data?.message || err.message || err);
       setError(err.response?.data?.message || 'Failed to update user role. You cannot change your own role.');
     }
   };
 
   const handleDeleteUser = async (userId) => {
     try {
-      await axios.delete(`https://quizmaster-vhb6.onrender.com/admin/user/${userId}`, { withCredentials: true });
+      console.log(`AdminDashboard: Deleting user ${userId} from ${API_BASE_URL}/admin/user/${userId}`);
+      await axios.delete(`${API_BASE_URL}/admin/user/${userId}`, { withCredentials: true });
       setMessage('User deleted successfully!');
       setUsers(users.filter(u => u._id !== userId));
     } catch (err) {
-      console.error('Error deleting user:', err);
+      console.error('Error deleting user:', err.response?.data?.message || err.message || err);
       setError(err.response?.data?.message || 'Failed to delete user. You cannot delete your own account.');
     }
   };

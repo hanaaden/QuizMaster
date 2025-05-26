@@ -2,9 +2,21 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+// Get the API base URL from environment variables, no localhost fallback
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+
 // Configure axios to always send the Authorization header if a token exists
+// IMPORTANT: With HttpOnly cookies, the browser automatically sends the cookie.
+// Storing authToken in localStorage and setting it in headers might be redundant or conflicting
+// if your backend relies *only* on the HttpOnly cookie.
+// If your backend relies on the Bearer token in headers, ensure your login response
+// returns an authToken in the body, and you store it, then use this interceptor.
+// If your backend relies solely on HttpOnly cookies, this interceptor might not be needed for auth.
+// Let's assume for now your backend supports both or you intend to use Bearer tokens.
 axios.interceptors.request.use(
     config => {
+        // This is primarily for stateless APIs or if the token is explicitly
+        // passed in headers. For HttpOnly cookies, the browser handles it.
         const token = localStorage.getItem('authToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -22,24 +34,31 @@ const Navbar = ({ user, setUser }) => {
 
     const handleLogout = async () => {
         try {
-            // --- MODIFIED: Change to POST request, remove withCredentials ---
-            await axios.post('https://quizmaster-vhb6.onrender.com/logout');
+            // Use the dynamic API_BASE_URL for the logout endpoint
+            await axios.post(
+                `${API_BASE_URL}/logout`,
+                {}, // Send an empty object for POST request body if no data is needed
+                { withCredentials: true } // Crucial: Tells Axios to send the HttpOnly cookie for logout
+            );
 
-            // --- MODIFIED: Clear token from Local Storage ---
-            localStorage.removeItem('authToken');
+            // Clear all user-related data from Local Storage
             localStorage.removeItem('userRole');
             localStorage.removeItem('userId');
+            localStorage.removeItem('username'); // Clear username if stored
+            localStorage.removeItem('authToken'); // Clear auth token if you were storing it there
 
             setUser(null); // Clear user state in App.js
             navigate('/login'); // Redirect to login page after logout
             console.log("Logged out successfully.");
         } catch (error) {
             console.error('Logout failed:', error.response?.data || error.message);
-            alert('Logout failed. Please try again. (Token cleared locally)');
-            // Even if logout fails on server, clear client state to prevent stale login
-            localStorage.removeItem('authToken');
+            alert('Logout failed. Please try again. (Client-side session cleared)');
+            // Even if logout fails on server (e.g., network error), clear client state
+            // to prevent a stale login state and ensure the user is logged out visually.
             localStorage.removeItem('userRole');
             localStorage.removeItem('userId');
+            localStorage.removeItem('username');
+            localStorage.removeItem('authToken');
             setUser(null);
             navigate('/login');
         }
@@ -49,7 +68,7 @@ const Navbar = ({ user, setUser }) => {
     const isAdmin = user?.role === 'admin';
 
     return (
-        <nav className="bg-gradient-to-r from-purple-800 to-indigo-900 p-4 text-white shadow-lg fixed w-full top-0 z-50"> {/* Increased z-index for fixed nav */}
+        <nav className="bg-gradient-to-r from-purple-800 to-indigo-900 p-4 text-white shadow-lg fixed w-full top-0 z-50">
             <div className="container mx-auto flex justify-between items-center">
                 {/* Brand/Logo link */}
                 <Link to={isAuthenticated ? "/quizzes" : "/"} className="text-3xl font-extrabold tracking-wide hover:text-purple-200 transition-colors duration-300">
@@ -70,7 +89,7 @@ const Navbar = ({ user, setUser }) => {
                 </div>
 
                 {/* Desktop menu - hidden on mobile */}
-                <div className="hidden md:flex space-x-6 items-center"> {/* Increased space-x */}
+                <div className="hidden md:flex space-x-6 items-center">
                     {isAuthenticated ? (
                         <>
                             <Link to="/quizzes" className="text-lg font-medium hover:text-purple-200 transition-colors duration-300">Take Quiz</Link>
@@ -95,14 +114,14 @@ const Navbar = ({ user, setUser }) => {
             </div>
 
             {/* Mobile menu - toggles based on isOpen state */}
-            <div className={`md:hidden ${isOpen ? 'block' : 'hidden'} bg-indigo-900 pb-4 absolute w-full left-0 transition-all duration-300 ease-in-out ${isOpen ? 'top-full opacity-100' : 'top-[calc(-100%-64px)] opacity-0'}`}> {/* Adjusted positioning and added transition for smooth open/close */}
-                <div className="px-2 pt-2 pb-3 space-y-2 flex flex-col items-center"> {/* Increased space-y */}
+            <div className={`md:hidden ${isOpen ? 'block' : 'hidden'} bg-indigo-900 pb-4 absolute w-full left-0 transition-all duration-300 ease-in-out ${isOpen ? 'top-full opacity-100' : 'top-[calc(-100%-64px)] opacity-0'}`}>
+                <div className="px-2 pt-2 pb-3 space-y-2 flex flex-col items-center">
                     {isAuthenticated ? (
                         <>
                             <Link
                                 to="/quizzes"
                                 className="block text-white hover:bg-purple-700 px-4 py-3 rounded-lg text-base font-medium w-full text-center transition-colors duration-200"
-                                onClick={() => setIsOpen(false)} // Close menu on click
+                                onClick={() => setIsOpen(false)}
                             >
                                 Take Quiz
                             </Link>
@@ -123,7 +142,7 @@ const Navbar = ({ user, setUser }) => {
                                 </Link>
                             )}
                             <button
-                                onClick={() => { handleLogout(); setIsOpen(false); }} // Logout and close menu
+                                onClick={() => { handleLogout(); setIsOpen(false); }}
                                 className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-full transition-colors duration-300 w-full shadow-md"
                             >
                                 Logout

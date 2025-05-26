@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 
+// Get the API base URL from environment variables
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+
 const TakeQuizPage = () => {
   const { id } = useParams(); // quiz id from URL
   const navigate = useNavigate();
@@ -15,14 +18,23 @@ const TakeQuizPage = () => {
 
   useEffect(() => {
     const fetchQuiz = async () => {
+      // Essential check for API_BASE_URL
+      if (!API_BASE_URL) {
+        console.error("Error: API_BASE_URL is not defined. Please ensure it's set as an environment variable.");
+        setError("Configuration error: Backend URL not found. Please contact support.");
+        setLoading(false);
+        return;
+      }
+
       try {
-        const res = await axios.get(`https://quizmaster-vhb6.onrender.com/quizzes/${id}`, { withCredentials: true });
+        console.log(`TakeQuizPage: Fetching quiz ${id} from ${API_BASE_URL}/quizzes/${id}`);
+        const res = await axios.get(`${API_BASE_URL}/quizzes/${id}`, { withCredentials: true });
         setQuiz(res.data);
         setAnswers(Array(res.data.questions.length).fill(null)); // Initialize answers array
         setLoading(false);
       } catch (err) {
-        console.error("Error fetching quiz:", err);
-        setError('Failed to load quiz. It might not exist or you are not authorized.');
+        console.error("Error fetching quiz:", err.response?.data?.message || err.message || err);
+        setError(err.response?.data?.message || 'Failed to load quiz. It might not exist or you are not authorized.');
         setLoading(false);
       }
     };
@@ -73,8 +85,9 @@ const TakeQuizPage = () => {
       // Last question, submit quiz
       setSubmissionStatus(null); // Reset status
       try {
+        console.log(`TakeQuizPage: Submitting quiz ${id} to ${API_BASE_URL}/quiz/${id}/submit`);
         const res = await axios.post(
-          `https://quizmaster-vhb6.onrender.com/quiz/${id}/submit`,
+          `${API_BASE_URL}/quiz/${id}/submit`,
           { answers },
           { withCredentials: true }
         );
@@ -92,10 +105,10 @@ const TakeQuizPage = () => {
         // --- END MODIFIED SECTION ---
 
       } catch (err) {
-        console.error("Error submitting quiz:", err);
+        console.error("Error submitting quiz:", err.response?.data?.message || err.message || err);
         setSubmissionStatus('error');
         // Keep the alert for submission errors for now
-        alert('Error submitting quiz. Please try again.'); 
+        alert(err.response?.data?.message || 'Error submitting quiz. Please try again.'); 
       }
     }
   };
@@ -151,8 +164,8 @@ const TakeQuizPage = () => {
         <button
           onClick={handleNext}
           className="w-full bg-purple-600 text-white px-8 py-4 rounded-full text-xl md:text-2xl font-bold
-                     hover:bg-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl
-                     focus:outline-none focus:ring-4 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-violet-950 transform hover:-translate-y-1"
+                    hover:bg-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl
+                    focus:outline-none focus:ring-4 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-violet-950 transform hover:-translate-y-1"
         >
           {currentIndex + 1 === quiz.questions.length ? 'Submit Quiz' : 'Next Question'}
         </button>

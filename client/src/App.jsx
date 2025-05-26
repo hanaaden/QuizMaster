@@ -14,6 +14,9 @@ import ResultPage from "./components/ResultPage";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+// Get the API base URL from environment variables
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+
 const App = () => {
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -22,11 +25,18 @@ const App = () => {
   // This checks for an active session (via JWT cookie) on page load/refresh
   useEffect(() => {
     const fetchUser = async () => {
-      console.log("App.js: Attempting to fetch user on mount...");
+      // Essential check for API_BASE_URL
+      if (!API_BASE_URL) {
+        console.error("Error: API_BASE_URL is not defined. Please ensure it's set as an environment variable.");
+        setLoadingUser(false); // Stop loading even if error
+        return;
+      }
+
+      console.log("App.js: Attempting to fetch user from /me endpoint:", `${API_BASE_URL}/me`);
       try {
         // Make a GET request to your backend's /me endpoint
         // withCredentials is essential for sending HTTP-only cookies
-        const res = await axios.get("https://quizmaster-vhb6.onrender.com/me", { withCredentials: true });
+        const res = await axios.get(`${API_BASE_URL}/me`, { withCredentials: true });
         console.log("App.js: /me response received:", res.data);
         setUser(res.data.user); // Set the user state with fetched data
       } catch (err) {

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
+// Get the API base URL from environment variables, no localhost fallback
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+
 const SignUpPage = () => {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
@@ -14,20 +17,31 @@ const SignUpPage = () => {
     e.preventDefault();
     setError('');
     setSuccess(''); // Clear previous messages
+
+    // Crucial check: Ensure API_BASE_URL is defined
+    if (!API_BASE_URL) {
+      console.error("Error: API_BASE_URL is not defined. Please ensure it's set as an environment variable on Vercel.");
+      setError("Configuration error: Backend URL not found. Please contact support.");
+      return;
+    }
+
     try {
-      await axios.post('https://quizmaster-vhb6.onrender.com/register', {
+      console.log(`SignUpPage: Attempting registration for ${email} to ${API_BASE_URL}/register`);
+      await axios.post(`${API_BASE_URL}/register`, { // Use the dynamic API_BASE_URL
         username,
         email,
         password,
         role: 'user', // default role for signups
+      }, {
+        // No withCredentials needed here as registration doesn't send/receive an HttpOnly cookie
+        // immediately, it just gets a success message.
       });
       setSuccess('Account created successfully! Redirecting to login...');
-      // redirect to login after signup
       setTimeout(() => {
         navigate('/login');
       }, 2000); // Redirect after 2 seconds
     } catch (err) {
-      console.error("Signup error:", err);
+      console.error("Signup error:", err.response?.data?.message || err.message || err);
       setError(err.response?.data?.message || 'Signup failed. Please try again.');
     }
   };
@@ -69,8 +83,8 @@ const SignUpPage = () => {
           type="text"
           placeholder="Username"
           className="w-full mb-5 p-3 md:p-4 bg-white/20 text-white placeholder-gray-200
-                     rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
-                     focus:border-purple-300 outline-none transition duration-300 text-lg"
+                      rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
+                      focus:border-purple-300 outline-none transition duration-300 text-lg"
           required
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -79,8 +93,8 @@ const SignUpPage = () => {
           type="email"
           placeholder="Email"
           className="w-full mb-5 p-3 md:p-4 bg-white/20 text-white placeholder-gray-200
-                     rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
-                     focus:border-purple-300 outline-none transition duration-300 text-lg"
+                      rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
+                      focus:border-purple-300 outline-none transition duration-300 text-lg"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -89,8 +103,8 @@ const SignUpPage = () => {
           type="password"
           placeholder="Password"
           className="w-full mb-8 p-3 md:p-4 bg-white/20 text-white placeholder-gray-200
-                     rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
-                     focus:border-purple-300 outline-none transition duration-300 text-lg"
+                      rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
+                      focus:border-purple-300 outline-none transition duration-300 text-lg"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -99,9 +113,9 @@ const SignUpPage = () => {
         <button
           type="submit"
           className="w-full bg-purple-600 text-white py-3 md:py-4 rounded-lg
-                     text-xl font-bold hover:bg-purple-700 transition-colors duration-300
-                     focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2
-                     focus:ring-offset-violet-950 shadow-lg"
+                      text-xl font-bold hover:bg-purple-700 transition-colors duration-300
+                      focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2
+                      focus:ring-offset-violet-950 shadow-lg"
         >
           Sign Up
         </button>

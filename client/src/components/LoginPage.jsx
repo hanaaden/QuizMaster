@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios'; // Ensure axios is installed: npm install axios
+import axios from 'axios';
+
+// Get the API base URL from environment variables.
+// This WILL be set to your deployed Render backend URL (e.g., 'https://quizmaster-vhb6.onrender.com')
+// when deployed on Vercel. There is NO localhost fallback here.
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
 
 const LoginPage = ({ setUser }) => {
     const navigate = useNavigate();
@@ -11,43 +16,56 @@ const LoginPage = ({ setUser }) => {
     const handleLogin = async (e) => {
         e.preventDefault();
         setError(''); // Clear any previous errors
-        try {
-            console.log("LoginPage: Attempting login for", email);
 
-            // --- MODIFIED: Removed 'withCredentials' as token is in response body ---
+        // Add a crucial check: If API_BASE_URL is not set via environment variables, something is wrong.
+        if (!API_BASE_URL) {
+            console.error("Error: API_BASE_URL is not defined. Please ensure it's set as an environment variable on Vercel.");
+            setError("Configuration error: Backend URL not found. Please contact support.");
+            return;
+        }
+
+        try {
+            console.log(`LoginPage: Attempting login for ${email} to ${API_BASE_URL}/login`);
+
             const response = await axios.post(
-                'https://quizmaster-vhb6.onrender.com/login',
-                { email, password }
+                `${API_BASE_URL}/login`, // Use the dynamic API_BASE_URL
+                { email, password },
+                {
+                    withCredentials: true // CRUCIAL: Tells Axios to send/receive cookies (HttpOnly cookies)
+                }
             );
 
-            console.log("LoginPage: Login successful. Response data:", response.data);
+            console.log("LoginPage: Login successful. Response data (excluding token which is in HttpOnly cookie):", response.data);
 
-            // Store the token and user info from the response in Local Storage
-            localStorage.setItem('authToken', response.data.token);
-            localStorage.setItem('userRole', response.data.role); // Store role
-            localStorage.setItem('userId', response.data.userId); // Store userId
+            // Store user info from the response body in Local Storage.
+            // The authentication token itself is handled by the browser as an HttpOnly cookie,
+            // so we DO NOT store 'authToken' in localStorage.
+            localStorage.setItem('userRole', response.data.role);
+            localStorage.setItem('userId', response.data.userId);
+            if (response.data.username) {
+                localStorage.setItem('username', response.data.username);
+            }
 
-            // Set the user state directly from the login response if available,
-            // or fetch it from /me if /me gives richer user data.
-            setUser({ // Assuming response.data contains at least role and userId
+            // Set the user state for the application
+            setUser({
                 userId: response.data.userId,
                 role: response.data.role,
-                username: response.data.username, // Include username if your backend sends it
-                email: email, // Email might not be in response, but we have it from input
+                username: response.data.username,
+                email: email,
             });
             console.log("LoginPage: User state updated with data from login response.");
 
             // Redirect based on the user's role
             if (response.data.role === 'admin') {
                 console.log("LoginPage: Redirecting to /admin as role is admin.");
-                navigate('/admin'); // Redirect to admin dashboard
+                navigate('/admin');
             } else {
                 console.log("LoginPage: Redirecting to /quizzes as role is user.");
-                navigate('/quizzes'); // Redirect to quizzes listing page
+                navigate('/quizzes');
             }
 
         } catch (err) {
-            console.error("LoginPage: Login error details:", err.response?.data || err.message || err);
+            console.error("LoginPage: Login error details:", err.response?.data?.message || err.message || err);
             setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
         }
     };
@@ -84,8 +102,8 @@ const LoginPage = ({ setUser }) => {
                     type="email"
                     placeholder="Email"
                     className="w-full mb-5 p-3 md:p-4 bg-white/20 text-white placeholder-gray-200
-                                 rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
-                                 focus:border-purple-300 outline-none transition duration-300 text-lg"
+                               rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
+                               focus:border-purple-300 outline-none transition duration-300 text-lg"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -94,8 +112,8 @@ const LoginPage = ({ setUser }) => {
                     type="password"
                     placeholder="Password"
                     className="w-full mb-8 p-3 md:p-4 bg-white/20 text-white placeholder-gray-200
-                                 rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
-                                 focus:border-purple-300 outline-none transition duration-300 text-lg"
+                               rounded-lg border border-white/30 focus:ring-2 focus:ring-purple-300
+                               focus:border-purple-300 outline-none transition duration-300 text-lg"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -104,9 +122,9 @@ const LoginPage = ({ setUser }) => {
                 <button
                     type="submit"
                     className="w-full bg-purple-600 text-white py-3 md:py-4 rounded-lg
-                                 text-xl font-bold hover:bg-purple-700 transition-colors duration-300
-                                 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2
-                                 focus:ring-offset-violet-950 shadow-lg"
+                               text-xl font-bold hover:bg-purple-700 transition-colors duration-300
+                               focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2
+                               focus:ring-offset-violet-950 shadow-lg"
                 >
                     Login
                 </button>
